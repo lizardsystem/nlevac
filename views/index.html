@@ -13,6 +13,7 @@
 		<script src="leaflet/leaflet.js"></script>
 		<script src="javascripts/leaflet-hash.js"></script>		
 		<script src="javascripts/leaflet.draw.js"></script>
+		<script src="javascripts/leaflet-image.js"></script>
 		<script src="javascripts/dat.gui.min.js"></script>		
 		<script src="javascripts/jquery.min.js"></script>
 		<script src="javascripts/nprogress.js"></script>
@@ -24,7 +25,15 @@
 			}
 			html, body, #map {
 			    height: 100%;
-			}  
+			}
+			.legend {
+				display: none;
+			}
+			@media screen and (min-width: 768px) {
+			  .desktop {
+			    display: block;
+			  }
+			}			
 			.info {
 				padding: 6px 8px;
 				font: 14px/16px Arial, Helvetica, sans-serif;
@@ -74,9 +83,7 @@
 	</head>
 
 	<body>
-		<h2>BEREIKBAARHEIDSANALYSE</h2>
 		<div id="map"></div>
-
 
 	<script>
 		// In case we forget to take out console statements.
@@ -139,7 +146,7 @@
 
 		legend.onAdd = function (map) {
 
-			var div = L.DomUtil.create('div', 'info legend'),
+			var div = L.DomUtil.create('div', 'info legend desktop'),
 				grades = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45],
 				labels = [],
 				from, to;
@@ -163,7 +170,7 @@
 		var about = L.control({position: 'bottomright'});
 
 		about.onAdd = function (map) {
-			var div = L.DomUtil.create('div', 'info legend');
+			var div = L.DomUtil.create('div', 'info legend desktop');
 			div.innerHTML = "<strong>Wat is dit?</strong><br><hr size='0' noshade/><div style='width:121px;'>Klik ergens op de kaart om een bereikbaarheids-<br/>analyse te doen.</div>";
 			return div;
 		};
@@ -180,7 +187,7 @@
 		    }).done(function(data) {
 		        to_data = JSON.parse(data);
 		        // console.log('to_data',to_data);
-		        var startpopup = L.circle(e1.latlng, 100, {stroke:false, fillOpacity: 100, fillColor:'black'}).addTo(map) //.bindPopup(edgedata.osm_name + "...");
+		        var startpopup = L.circle(e1.latlng, 100, {stroke:false, fillOpacity: 100, fillColor:'black'}).addTo(map); //.bindPopup(edgedata.osm_name + "...");
 		        start_popups.push(startpopup);
 			      
 			    NProgress.start();
@@ -298,7 +305,22 @@
 	      this.distance = window.distance;
 	      this.max = window.max;
 	      this.zoomToRoute = false;
-	      this.message = 'Heerenveen';     
+	      this.message = 'Heerenveen';  
+          this.saveImage = function(e) { 
+
+			leafletImage(map, function(err, canvas) {
+			    // now you have canvas
+			    // example thing to do with that canvas:
+			    var img = document.createElement('img');
+			    var dimensions = map.getSize();
+			    img.width = dimensions.x;
+			    img.height = dimensions.y;
+			    img.src = canvas.toDataURL();
+				var url = img.src.replace(/^data:image\/[^;]/, 'data:application/octet-stream');
+				window.open(url);
+			});
+
+          }; 
 	    };
 	    var simulation = new SimulationValues();
 
@@ -321,6 +343,7 @@
 	    var max_controller = f1.add(simulation, 'max', 0, 9000).name("Max results");
         var zoomtoroute_controller = f1.add(simulation, 'zoomToRoute').name('Zoom to route');
 		var scenario_controller = f1.add(simulation, 'message').name('3Di model');
+		// f1.add(simulation, 'saveImage').name('Kaart opslaan');
 
 	    // distance_controller.onChange(function(value) {
 	    //   console.log("Distance: ", value);

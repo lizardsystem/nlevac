@@ -1,10 +1,23 @@
 var config = require('./config');
+var cluster = require('cluster');
 var express = require('express');
 var http = require('http');
 var request = require('request');
 var path = require('path');
 var pg = require('pg');
 var fs = require('fs');
+
+
+
+if (cluster.isMaster) {
+    // Count the machine's CPUs
+    var cpuCount = require('os').cpus().length;
+
+    // Create a worker for each CPU
+    for (var i = 0; i < cpuCount; i += 1) {
+        cluster.fork();
+    }  
+} else {
 
 
 // Initialize application
@@ -235,4 +248,17 @@ function(req, res) {
 
 // Server at fixed port 80, requires sudo
 http.createServer(app).listen(3034, '0.0.0.0');
+console.log('Worker ' + cluster.worker.id + ' running!');
+
 // http.createServer(app).listen(80, '0.0.0.0');
+}
+
+
+cluster.on('exit', function (worker) {
+
+    // Replace the dead worker,
+    // we're not sentimental
+    console.log('Worker ' + worker.id + ' died :(');
+    cluster.fork();
+
+});
