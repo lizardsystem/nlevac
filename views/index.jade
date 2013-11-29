@@ -1,0 +1,27 @@
+!!! 5
+html
+  head
+    title Netherlands - Reachability Analysis
+    meta(name='viewport', content='width=device-width')
+    link(href='http://fonts.googleapis.com/css?family=Droid+Sans:400,700', rel='stylesheet', type='text/css')
+    link(rel='stylesheet', href='/leaflet/leaflet.css')
+    link(rel='stylesheet', href='/stylesheets/style.css')
+    link(rel='stylesheet', href='/stylesheets/nprogress.css')
+    link(rel='stylesheet', href='/javascripts/leaflet.draw.css')
+    //if lte IE 8
+      link(rel='stylesheet', href='javascripts/leaflet.draw.ie.css')
+    script(src='/leaflet/leaflet.js')
+    script(src='/javascripts/json2.js')
+    script(src='/javascripts/leaflet-hash.js')
+    script(src='/javascripts/leaflet.draw.js')
+    script(src='/javascripts/leaflet-image.js')
+    script(src='/javascripts/polyline-encoded.js')
+    script(src='/javascripts/dat.gui.min.js')
+    script(src='/javascripts/jquery.min.js')
+    script(src='/javascripts/nprogress.js')
+    script(src='/javascripts/color.js')
+    script(src='/javascripts/app.js')
+    script.
+      window.clientid = #{id};
+  body
+    #map

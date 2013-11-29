@@ -1,11 +1,14 @@
 var config = require('./config');
 var cluster = require('cluster');
+var polylineEncoded = require('./public/javascripts/polyline-encoded');
 var express = require('express');
 var http = require('http');
 var request = require('request');
 var path = require('path');
 var pg = require('pg');
 var fs = require('fs');
+var Hashids = require("hashids"),
+    hashids = new Hashids("$#f4f34f4444dasdsadaddddioij3n2nn#");
 
 
 
@@ -31,11 +34,12 @@ app.configure(function(){
   // app.set('view engine', 'ejs');
   app.set('view engine', 'html');
   // app.enable('view cache');
-  app.engine('html', require('hogan-express'));
+  app.engine('jade', require('jade').__express);
   app.set('layout', 'layout');
   app.use(express.favicon());
   app.use(express.logger('dev'));
-  app.use(express.bodyParser());
+  // app.use(express.bodyParser());
+  app.use(express.bodyParser({strict: false}));
   app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "X-Requested-With");
@@ -102,91 +106,38 @@ function(req, res) {
   });
 });
 
-app.get('/alpha',
-function(req, res) {
-
-  var length = parseFloat(req.query.length);
-  if(!length) length = 1;
-  // var startingPoint = parseFloat(req.query.startingpoint);
-  var startingPoint = 46759;
-
-  var sql1 = "DROP TABLE IF EXISTS node;CREATE TEMPORARY TABLE node AS      \
-                SELECT id,                                                  \
-                    ST_X("+geometryFieldName+") AS x,                       \
-                    ST_Y("+geometryFieldName+") AS y,                       \
-                    geom                                                    \
-                    FROM (                                                  \
-                        SELECT source AS id,                                \
-                            ST_StartPoint("+geometryFieldName+") AS geom    \
-                            FROM "+pgroutingTable+"                         \
-                        UNION                                               \
-                        SELECT target AS id,                                \
-                            ST_EndPoint("+geometryFieldName+") AS geom      \
-                            FROM "+pgroutingTable+"                         \
-                    ) AS node";
 
 
-  var sql2 = "SELECT * FROM pgr_alphashape('               \
-                SELECT *                                   \
-                    FROM node                              \
-                    JOIN                                   \
-                    (SELECT * FROM pgr_drivingDistance(''  \
-                        SELECT gid AS id,                  \
-                            source::int4 AS source,        \
-                            target::int4 AS target,        \
-                            cost::float8 AS cost           \
-                            FROM "+pgroutingTable+"'',     \
-                        "+startingPoint+", "+length+", true, false)) \
-                    AS dd ON node.id = dd.id1'::text)";
-
-  // console.log('alpha sql1: ', sql1);
-  // console.log('alpha sql2: ', sql2);
-
-  var query = client.query(sql1, function(err1, result1) {
-    //NOTE: error handling not present
-    if(result1) {
-      var query2 = client.query(sql2, function(err2, result2) {
-        if(result2) {
-          var json = JSON.stringify(result2.rows);
-          res.json(json);
-        } else {
-          console.log('alpha error 2:', err2)
-          res.json('{}');
-        }
-      });
-    } else {
-      console.log('alpha error 1:', err1);
-      res.json('{}');
-    }
-  });
-  query.on('error', function(error) {
-    console.log(error);
-  });
-});
-
-app.get('/route',
+app.get('/route/:clientid',
 function(req, res) {
 
   var startEdge = parseFloat(req.query.startedge);
   var endEdge = parseFloat(req.query.endedge);
+  var clientid = parseInt(req.param('clientid'));
 
-  var sql = "SELECT * FROM pgr_dijkstra( \
-               'SELECT id, \
-                       source::int4 AS source, \
-                       target::int4 AS target, \
-                       cost::float8, \
-                       reverse_cost::float8 AS reverse_cost \
-                FROM \
-                       "+pgroutingTable+"', \
-                       "+startEdge+", "+endEdge+", false, false) \
-              JOIN "+pgroutingTable+" \
-              ON id2 = "+pgroutingTable+".id ORDER BY seq";
+  var sql = "SELECT * FROM                                                          \
+             pgr_astar(                                                             \
+               'SELECT id, source, target, cost, x1, y1, x2, y2                     \
+               FROM "+pgroutingTable+" AS a                                         \
+               WHERE a.id NOT IN(                                                   \
+                 SELECT b.id                                                        \
+                   FROM "+pgroutingTable+" AS b,                                    \
+                   (SELECT ST_SetSRID(ST_Collect(the_geom), 4326) AS the_geom FROM polygons WHERE clientid = "+clientid+") AS c     \
+                 WHERE ST_Intersects(b.geom_way,c.the_geom)                         \
+               )',                                                                  \
+            "+startEdge+", "+endEdge+", false, false)                               \
+            JOIN "+pgroutingTable+"                                                 \
+            ON id2 = "+pgroutingTable+".id ORDER BY seq";
+
+
 
   var query = client.query(sql, function(err, result) {
     //NOTE: error handling not present
     if(result) {
+
       var json = JSON.stringify(result.rows);
-      console.log(json);
+      // console.log('result:', result);
+      // console.log('route json:', json);
       res.json(json);
     } else {
       console.log(err);
@@ -198,19 +149,19 @@ function(req, res) {
   });
 });
 
-app.get('/catchment',
+app.get('/catchment/:clientid',
 function(req, res) {
-
+  var clientid = parseInt(req.param('clientid'));
   var length = parseFloat(req.query.length);
   // var length = 1;
   var startingPoint = parseFloat(req.query.startingpoint);
   var max = req.query.max;
 
-  var sql = "SELECT *                                           \
+  var sql = "SELECT osm_name, km, kmh, x1, y1, x2, y2, route.cost     \
       FROM "+pgroutingTable+"                                   \
       JOIN                                                      \
       (SELECT id2 AS vertex_id, cost FROM pgr_drivingdistance(' \
-            SELECT id AS id,                                   \
+            SELECT id AS id,                                    \
                 source::int4,                                   \
                 target::int4,                                   \
                 cost::float8                                    \
@@ -221,13 +172,15 @@ function(req, res) {
             false)) AS route                                    \
       ON "+pgroutingTable+".id = route.vertex_id ORDER BY "+pgroutingTable+".cost LIMIT " + max;
 
+
+
   console.log('catchment sql: ', sql);
 
   var query = client.query(sql, function(err, result) {
     //NOTE: error handling not present
     if(result) {
+      // console.log('result:', result);
       var json = JSON.stringify(result.rows);
-      // console.log(json);
       res.json(json);
     } else {
       console.log('catchment error:', err);
@@ -240,25 +193,104 @@ function(req, res) {
 });
 
 
-app.get('/',
+app.post('/polygon/:clientid',
 function(req, res) {
-    res.render('index.html', {});
+  console.log('req.body.polygon:', req.body.polygon);
+  console.log('id:', req.param('clientid'));
+  var clientid = parseInt(req.param('clientid'));
+
+  var query = client.query('INSERT INTO "polygons" (the_geom, clientid) VALUES (ST_GeomFromGeoJSON($1), ($2))', [req.body.polygon, clientid]);
+  query.on('end', function() {
+    res.json(req.body.polygon);
+  });
+  query.on('error', function(error) {
+    console.log(error);
+  });
+});
+
+app.get('/polygons/:clientid',
+function(req, res) {
+  var clientid = parseInt(req.param('clientid'));
+  var query = client.query('SELECT ST_AsGeoJSON(the_geom) AS geometry FROM "polygons" WHERE clientid = $1', [clientid]);
+  var rows = [];
+  query.on('row', function(row) {
+    console.log(row);
+    rows.push(row);
+  });
+  query.on('end', function(result) {
+    res.json(rows);
+  });
 });
 
 
-// Server at fixed port 80, requires sudo
+
+app.get('/',
+function(req, res) {
+
+  // A fresh visit. Create and return a new record
+  var query = client.query('INSERT INTO "sessions" VALUES(default) RETURNING id, timestamp');
+  query.on('row', function(row) {
+
+    // Generate hash based on ID
+    var id = hashids.encrypt(parseInt(row.id));
+    
+    // Redirect to hash
+    res.redirect('/' + id);
+  });
+  query.on('error', function(error) {
+    console.error('Error:', error);
+  });
+});
+
+
+app.get('/:hash',
+function(req, res) {
+
+  // We're getting a hash
+    if(req.param('hash')) {
+      var hash = req.param('hash');  
+
+      // Let's turn that into the original ID
+      var id = hashids.decrypt(hash);
+      console.log('id: ' + id + ', hash: ' + hash);
+
+      if (!parseInt(id)) {
+        // No integer returned by hash decryptor
+        // Return to homepage to generate new session
+        res.redirect('/');
+      } else {
+        // Check if it exists
+        var query = client.query('SELECT COUNT(*) AS total FROM "sessions" WHERE id = $1', [parseInt(id)]);
+        query.on('row', function(row) {
+          console.log(row.total);
+          if(row.total > 0) {
+            // If so, pass it into the template
+            res.render('index.jade', {
+              id: id
+            }); 
+          } else {
+            // Else, return to homepage to generate new session
+            res.redirect('/');
+          }
+        });
+        query.on('error', function(error) {
+          console.error('Error:', error);
+        });           
+      }
+    }
+});
+
+// Kick off the server workers
 http.createServer(app).listen(3034, '0.0.0.0');
 console.log('Worker ' + cluster.worker.id + ' running!');
-
 // http.createServer(app).listen(80, '0.0.0.0');
-}
+
+
+} // end of (cluster.isMaster)
 
 
 cluster.on('exit', function (worker) {
-
-    // Replace the dead worker,
-    // we're not sentimental
+    // Replace the dead worker, we're not sentimental
     console.log('Worker ' + worker.id + ' died :(');
     cluster.fork();
-
 });

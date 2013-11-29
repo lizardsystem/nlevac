@@ -1,0 +1,59 @@
+!!! 5
+html
+  head
+    title Netherlands - Reachability Analysis
+    meta(charset='utf-8')
+    meta(name='viewport', content='initial-scale=1.0, user-scalable=no, width=device-width')
+    link(href='http://fonts.googleapis.com/css?family=Droid+Sans:400,700', rel='stylesheet', type='text/css')
+    link(href='/javascripts/ol3/ol.css', rel='stylesheet')
+    style
+      html, body, #ol-map {
+      height: 100%;
+      margin: 0;
+      }
+      #ol-map {
+      width: 100%;
+      }
+    script(src='/javascripts/ol3/ol-whitespace.js')
+  body
+    #ol-map
+    script(type='text/javascript')
+      var style = new ol.style.Style({
+      symbolizers: [
+      new ol.style.Shape({
+      size: ol.expr.parse('5 + 20'),
+      fill: new ol.style.Fill({
+      color: '#ff9900',
+      opacity: 0.4
+      }),
+      stroke: new ol.style.Stroke({
+      color: '#ffcc00',
+      opacity: 0.2
+      })
+      })
+      ]
+      });
+      var vector = new ol.layer.Vector({
+      source: new ol.source.Vector({
+      parser: new ol.parser.GeoJSON(),
+      url: '/catchment?startingpoint=201183&length=1&max=500'
+      }),
+      style: style
+      });
+      var map = new ol.Map({
+      target: 'ol-map',
+      renderer: ol.RendererHint.WEBGL,
+      layers: [
+      new ol.layer.Tile({
+      source: new ol.source.OSM()
+      }),
+      vector
+      ],
+      view: new ol.View2D({
+      center: ol.proj.transform([5.811767578125,52.13854550670474], 'EPSG:4326', 'EPSG:3857'),
+      zoom: 8
+      })
+      });
+      map.on('click', function(e) {
+      console.log('event', e);
+      });

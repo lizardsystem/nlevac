@@ -1,0 +1,172 @@
+  var sql = "SELECT *                                           \
+      FROM "+pgroutingTable+"                                   \
+      JOIN                                                      \
+      (SELECT id2 AS vertex_id, cost FROM pgr_drivingdistance(' \
+            SELECT id AS id,                                    \
+                source::int4,                                   \
+                target::int4,                                   \
+                cost::float8                                    \
+            FROM "+pgroutingTable+"',                           \
+            " + startingPoint + ",                              \
+            " + length + ",                                     \
+            false,                                              \
+            false)) AS route                                    \
+      ON "+pgroutingTable+".id = route.vertex_id ORDER BY "+pgroutingTable+".cost LIMIT " + max;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.get('/alpha',
+function(req, res) {
+
+  var length = parseFloat(req.query.length);
+  if(!length) length = 1;
+  // var startingPoint = parseFloat(req.query.startingpoint);
+  var startingPoint = 46759;
+
+  var sql1 = "DROP TABLE IF EXISTS node;CREATE TEMPORARY TABLE node AS      \
+                SELECT id,                                                  \
+                    ST_X("+geometryFieldName+") AS x,                       \
+                    ST_Y("+geometryFieldName+") AS y,                       \
+                    geom                                                    \
+                    FROM (                                                  \
+                        SELECT source AS id,                                \
+                            ST_StartPoint("+geometryFieldName+") AS geom    \
+                            FROM "+pgroutingTable+"                         \
+                        UNION                                               \
+                        SELECT target AS id,                                \
+                            ST_EndPoint("+geometryFieldName+") AS geom      \
+                            FROM "+pgroutingTable+"                         \
+                    ) AS node";
+
+
+  var sql2 = "SELECT * FROM pgr_alphashape('               \
+                SELECT *                                   \
+                    FROM node                              \
+                    JOIN                                   \
+                    (SELECT * FROM pgr_drivingDistance(''  \
+                        SELECT gid AS id,                  \
+                            source::int4 AS source,        \
+                            target::int4 AS target,        \
+                            cost::float8 AS cost           \
+                            FROM "+pgroutingTable+"'',     \
+                        "+startingPoint+", "+length+", true, false)) \
+                    AS dd ON node.id = dd.id1'::text)";
+
+
+  var query = client.query(sql1, function(err1, result1) {
+    //NOTE: error handling not present
+    if(result1) {
+      var query2 = client.query(sql2, function(err2, result2) {
+        if(result2) {
+          var json = JSON.stringify(result2.rows);
+          res.json(json);
+        } else {
+          console.log('alpha error 2:', err2)
+          res.json('{}');
+        }
+      });
+    } else {
+      console.log('alpha error 1:', err1);
+      res.json('{}');
+    }
+  });
+  query.on('error', function(error) {
+    console.log(error);
+  });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // OLD!
+  // var sql = "SELECT * FROM pgr_dijkstra( \
+  //              'SELECT id, \
+  //                      source::int4 AS source, \
+  //                      target::int4 AS target, \
+  //                      cost::float8, \
+  //                      reverse_cost::float8 AS reverse_cost \
+  //               FROM \
+  //                      "+pgroutingTable+"', \
+  //                      "+startEdge+", "+endEdge+", false, false) \
+  //             JOIN "+pgroutingTable+" \
+  //             ON id2 = "+pgroutingTable+".id ORDER BY seq";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // app.get('/polygons/clear',
+// function(req, res) {
+//   var query = client.query('TRUNCATE polygons');
+//   var rows = [];
+//   query.on('row', function(row) {
+//     console.log(row);
+//     rows.push(row);
+//   });
+//   query.on('end', function(result) {
+//     res.json(rows);
+//   });
+// });
