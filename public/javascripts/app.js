@@ -38,8 +38,8 @@ var satlayer = L.tileLayer('http://khm1.googleapis.com/kh/v=137&src=app&x={x}&y=
 });
 
 // Define and add an OSM baselayer
-var osmlayer = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+var osmlayer = L.tileLayer('http://otile1.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://osm.org/copyright">MapQuest</a> contributors'
 });
 
 
@@ -51,6 +51,7 @@ var map = L.map('map', {
 window.mapobj = map;
 var hash = new L.Hash(map);
 var scale = new L.control.scale().addTo(map);
+var geoloc = new L.control.locate().addTo(map);
 
 // Configure basemaps object
 var baseMaps = {
