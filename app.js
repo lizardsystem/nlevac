@@ -64,6 +64,11 @@ var geometryFieldName = 'geom_way';
 var client = new pg.Client(config.pg.conString);
 client.connect();
 
+client.on('error', function(error) {
+  console.error('Error from PG: ', error);
+  client.connect();
+});
+
 
 app.get('/edge',
 function(req, res) {
@@ -132,12 +137,9 @@ function(req, res) {
 
 
   var query = client.query(sql, function(err, result) {
-    //NOTE: error handling not present
     if(result) {
 
       var json = JSON.stringify(result.rows);
-      // console.log('result:', result);
-      // console.log('route json:', json);
       res.json(json);
     } else {
       console.log(err);

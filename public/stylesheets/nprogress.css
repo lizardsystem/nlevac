@@ -46,9 +46,9 @@
   width: 14px;
   height: 14px;
 
-  border:  solid 2px transparent;
-  border-top-color:  #29d;
-  border-left-color: #29d;
+  border:  solid 5px transparent;
+  border-top-color:  #fff;
+  border-left-color: #fff;
   border-radius: 10px;
 
   -webkit-animation: nprogress-spinner 400ms linear infinite;
