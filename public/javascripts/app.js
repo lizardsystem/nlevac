@@ -107,7 +107,7 @@ var overlayMaps = {
     "Luchtdruk": pressure,
     "Druklijnen": pressurecntr,
     "Temperatuur": temp,
-    "Windrichting": wind
+    "Wind": wind
     // "Windroos": windrose,
     // "Stations": station,
     // "Steden": city
