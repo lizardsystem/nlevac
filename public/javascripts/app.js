@@ -32,21 +32,62 @@ var Cyan = Color({hue: 180, saturation: 1, lightness: 0.5});
 var Magenta = Color("hsl(300, 100%, 50%)");
 var Yellow = Color([255,255,0]);
 
-// Satellite baselayer
+// Google Satellite baselayer
 var satlayer = L.tileLayer('http://khm1.googleapis.com/kh/v=137&src=app&x={x}&y={y}&z={z}&s=&token=66417.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+    attribution: '&copy; <a href="http://google.com/">Google</a>'
 });
 
-// Define and add an OSM baselayer
-var osmlayer = L.tileLayer('http://otile1.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">MapQuest</a> contributors'
+// MapQuest baselayer
+var mqlayer = L.tileLayer('http://otile1.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://mapquest.com/">MapQuest</a>'
 });
 
+// OSM baselayer
+var osmlayer = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://www.openstreetmap.org/">OpenStreetMap and contributors</a>'
+});
 
+var clouds = L.OWM.clouds({opacity:0.5});
+var cloudscls = L.OWM.cloudsClassic({opacity:0.5});
+var precipitation = L.OWM.precipitation({opacity:0.5});
+var precipitationcls = L.OWM.precipitationClassic({opacity:0.5});
+var rain = L.OWM.rain({opacity:0.5});
+var raincls = L.OWM.rainClassic({opacity:0.5});
+var snow = L.OWM.snow({opacity:0.5});
+var pressure = L.OWM.pressure({opacity:0.5});
+var pressurecntr = L.OWM.pressureContour({opacity:0.5});
+var temp = L.OWM.temperature({opacity:0.5});
+var wind = L.OWM.wind({opacity:0.5});
+
+var OWM_API_KEY = "";
+var city = L.OWM.current({intervall: 15, imageLoadingUrl: '/javascripts/owmloading.gif', lang: 'en', minZoom: 5,
+        appId: OWM_API_KEY});
+var station = L.OWM.current({type: 'station', intervall: 15, imageLoadingUrl: '/javascripts/owmloading.gif', lang: 'en',
+        appId: OWM_API_KEY /* , markerFunction: myOwmMarker, popupFunction: myOwmPopup */ });
+var windrose = L.OWM.current({intervall: 15, imageLoadingUrl: '/javascripts/owmloading.gif', lang: 'en', minZoom: 4,
+        appId: OWM_API_KEY, markerFunction: myWindroseMarker, popup: false, clusterSize: 50,
+        imageLoadingBgUrl: 'http://openweathermap.org/img/w0/iwind.png' });
+windrose.on('owmlayeradd', windroseAdded, windrose); // Add an event listener to get informed when windrose layer is ready
+
+/**
+ * Example function to replace leaflet-openweathermap's builtin marker.
+ */
+function myOwmMarker(data) {
+    // just a Leaflet default marker
+    return L.marker([data.coord.lat, data.coord.lon]);
+}
+
+/**
+ * Example function to replace leaflet-openweathermap's builtin popup.
+ */
+function myOwmPopup(data) {
+    // just a Leaflet default popup
+    return L.popup().setContent(typeof data.name != 'undefined' ? data.name : data.id);
+}
 
 // Instantiate Leaflet
 var map = L.map('map', {
-    layers: [osmlayer]
+    layers: [mqlayer]
 }).setView([52.13854550670474,5.811767578125], 8);
 window.mapobj = map;
 var hash = new L.Hash(map);
@@ -56,10 +97,23 @@ var geoloc = new L.control.locate().addTo(map);
 // Configure basemaps object
 var baseMaps = {
     "Satellite": satlayer,
-    "OSM": osmlayer
+    "OSM": osmlayer,
+    "MapQuest": mqlayer
+};
+var overlayMaps = {
+    "Neerslag": precipitation,
+    "Bewolking": clouds,
+    "Sneeuwval": snow,
+    "Luchtdruk": pressure,
+    "Druklijnen": pressurecntr,
+    "Temperatuur": temp,
+    "Windrichting": wind
+    // "Windroos": windrose,
+    // "Stations": station,
+    // "Steden": city
 };
 // Add basemap selector
-L.control.layers(baseMaps, {}, {position: 'bottomleft'}).addTo(map);
+var layerControl = L.control.layers(baseMaps, overlayMaps, {position: 'bottomleft'}).addTo(map);
 
 
 
@@ -132,7 +186,7 @@ map.on('click', function(e1){
 
         clearCircles();
         $.ajax({
-          url: "/edge?lat="+e1.latlng.lat+"&lon="+e1.latlng.lng
+          url: "/api/v1/edge?lat="+e1.latlng.lat+"&lon="+e1.latlng.lng
         }).done(function(data) {
             to_data = JSON.parse(data);
             // console.log('to_data',to_data);
@@ -141,7 +195,7 @@ map.on('click', function(e1){
               
             NProgress.inc();
             $.ajax({
-                url: "/catchment/"+window.clientid+"?startingpoint=" + to_data.source + "&length=" + window.distance + "&max=" + window.max
+                url: "/api/v1/catchment/"+window.clientid+"?startingpoint=" + to_data.source + "&length=" + window.distance + "&max=" + window.max
             }).done(function(catchment_data) {
                 NProgress.done();
                 var cd = JSON.parse(catchment_data);
@@ -166,12 +220,12 @@ map.on('click', function(e1){
                     circle.on('click', function(e2) {
                         NProgress.start();
                         $.ajax({
-                          url: "/edge?lat="+e2.latlng.lat+"&lon="+e2.latlng.lng
+                          url: "/api/v1/edge?lat="+e2.latlng.lat+"&lon="+e2.latlng.lng
                         }).done(function(data) {
                           NProgress.set(0.4);
                           var from_data = JSON.parse(data);
                             $.ajax({
-                                url: "/route/"+window.clientid+"?startedge="+from_data.source+"&endedge="+to_data.target
+                                url: "/api/v1/route/"+window.clientid+"?startedge="+from_data.source+"&endedge="+to_data.target
                             }).done(function(e3) {
                                 // $.each(routes, function(i,v) { map.removeLayer(v); });
 
@@ -208,12 +262,14 @@ map.on('click', function(e1){
             // Start of route
             NProgress.inc();
             $.ajax({
-                url: "/edge?lat="+e1.latlng.lat+"&lon="+e1.latlng.lng
+                url: "/api/v1/edge?lat="+e1.latlng.lat+"&lon="+e1.latlng.lng
             }).done(function(data) {
                 NProgress.done();
                 from_data = JSON.parse(data);
+                var fromName;
+                if(from_data.osm_name === null) { fromName = 'onbekend beginpunt'; } else { fromName = from_data.osm_name; }
                 var startpopup = L.marker(e1.latlng).addTo(map)
-                    .bindPopup("Van " + from_data.osm_name + "...").openPopup();
+                    .bindPopup("Van " + fromName + "...").openPopup();
                 start_popups.push(startpopup);
             });
             return true;
@@ -221,32 +277,39 @@ map.on('click', function(e1){
             // End of route
             NProgress.start();
             $.ajax({
-                url: "/edge?lat="+e1.latlng.lat+"&lon="+e1.latlng.lng
+                url: "/api/v1/edge?lat="+e1.latlng.lat+"&lon="+e1.latlng.lng
             }).done(function(data) {
                 to_data = JSON.parse(data);
+                var toName;
+                if(to_data.osm_name === null) { toName = 'onbekend eindpunt'; } else { toName = to_data.osm_name; }
                 var endpopup = L.marker(e1.latlng, {
                         bounceOnAdd: true,
                         bounceOnAddOptions: {duration: 500, height: 100}
                     }).addTo(map)
-                    .bindPopup("Naar " + to_data.osm_name + "...").openPopup();
+                    .bindPopup("Naar " + toName + "...").openPopup();
                     end_popups.push(endpopup);
 
                 $.ajax({
-                    url: "/route/"+window.clientid+"?startedge="+from_data.source+"&endedge="+to_data.target
+                    url: "/api/v1/route/"+window.clientid+"?startedge="+from_data.source+"&endedge="+to_data.target
                 }).done(function(e) {
-                    NProgress.done();
-                    var route_data = JSON.parse(e);
-                    var latlngs = [];
-                    
-                    // latlngs.push(e1.latlng);
-                    $.each(route_data, function(i,value) {
-                        latlngs.push(new L.LatLng(value.y1, value.x1));
-                    });
-                    latlngs.push(endpopup._latlng);
-                    
-                    var pl = new L.Polyline(latlngs, {color:'red', weight: 10, clickable: false}).addTo(map);
-                    routes.push(pl);
-                    if(window.zoomtoroute) { map.fitBounds(pl.getBounds()); }
+                    if(e.name === 'error') {
+                        NProgress.done();
+                        alert('Er ging iets mis, probeer het nogmaals s.v.p.');
+                    } else {
+                        NProgress.done();
+                        var route_data = JSON.parse(e);
+                        var latlngs = [];
+                        
+                        // latlngs.push(e1.latlng);
+                        $.each(route_data, function(i,value) {
+                            latlngs.push(new L.LatLng(value.y1, value.x1));
+                        });
+                        latlngs.push(endpopup._latlng);
+                        
+                        var pl = new L.Polyline(latlngs, {color:'red', weight: 10, clickable: false}).addTo(map);
+                        routes.push(pl);
+                        if(window.zoomtoroute) { map.fitBounds(pl.getBounds()); }
+                    }
                 });
             });
         }
@@ -297,7 +360,7 @@ map.on('draw:created', function (e) {
     if (type === 'polygon') {
         $.ajax({
           type: "POST",
-          url: "/polygon/" + window.clientid,
+          url: "/api/v1/polygon/" + window.clientid,
           data: {"polygon": JSON.stringify(layer.toGeoJSON().geometry)}
         }).done(function( msg ) {
           // console.log('Done!', msg);
@@ -315,7 +378,7 @@ map.on('draw:created', function (e) {
  */
 
 $.ajax({
-  url: "/polygons/" + window.clientid
+  url: "/api/v1/polygons/" + window.clientid
 }).done(function(polygons) {
   for (var i = 0; i < polygons.length; i++) {
     if(polygons[i].geometry){
@@ -356,6 +419,10 @@ var SimulationValues = function() {
     };
 };
 var ControlValues = function() {
+    this.recalcRoutes = function() {
+        alert('Sorry, dit werkt nog niet... Als je wil dat dit gaat werken, mail Nelen & Schuurmans...');
+        return true;
+    };
     this.resetRoutes = function() {
         clearStartCircles(); clearRoutes();
     };
@@ -382,6 +449,7 @@ var max_controller = gui.add(simulation, 'max', 0, 9000).name("Max resultaten");
 var zoomtoroute_controller = gui.add(simulation, 'zoomToRoute').name('Zoom naar route');
 // var export_controller = gui.add(simulation, 'savemap').name('Exporteer afbeelding');
 
+var recalc_controller = gui.add(controls, 'recalcRoutes').name('Herberekenen');
 var reset_routes_controller = gui.add(controls, 'resetRoutes').name('Verwijder routes');
 var reset_circles_controller = gui.add(controls, 'resetCircles').name('Verwijder punten');
 var reset_total_controller = gui.add(controls, 'resetApp').name('Nieuwe sessie');
@@ -397,7 +465,9 @@ zoomtoroute_controller.onChange(function(checked) {
   }
 });     
 scenario_controller.onFinishChange(function(value) {
-    console.log('scenario:',value);
+    alert('Sorry, dit werkt nog niet... Als je wil dat dit gaat werken, mail Nelen & Schuurmans...');
+    return true;
+    // console.log('scenario:',value);
 });
 
 
@@ -535,4 +605,117 @@ if (!Object.prototype.unwatch) {
             this[prop] = val;
         }
     });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Example function to replace leaflet-openweathermap's builtin marker by a wind rose symbol.
+ * Some helper functions and an event listener are needed, too. See below.
+ */
+function myWindroseMarker(data) {
+    var content = '<canvas id="id_' + data.id + '" width="50" height="50"></canvas>';
+    var icon = L.divIcon({html: content, iconSize: [50,50], className: 'owm-div-windrose'});
+    return L.marker([data.coord.lat, data.coord.lon], {icon: icon, clickable: false});
+}
+
+/**
+ * Helper function for replacing leaflet-openweathermap's builtin marker by a wind rose symbol.
+ * This function draws the canvas of one marker symbol once it is available in the DOM.
+ */
+function myWindroseDrawCanvas(data, owm) {
+
+    var canvas = document.getElementById('id_' + data.id);
+    canvas.title = data.name;
+    var angle = 0;
+    var speed = 0;
+    var gust = 0;
+    if (typeof data.wind != 'undefined') {
+        if (typeof data.wind.speed != 'undefined') {
+            canvas.title += ', ' + data.wind.speed + ' m/s';
+            canvas.title += ', ' + owm._windMsToBft(data.wind.speed) + ' BFT';
+            speed = data.wind.speed;
+        }
+        if (typeof data.wind.deg != 'undefined') {
+            //canvas.title += ', ' + data.wind.deg + 'Â°';
+            canvas.title += ', ' + owm._directions[(data.wind.deg/22.5).toFixed(0)];
+            angle = data.wind.deg;
+        }
+        if (typeof data.wind.gust != 'undefined') {
+            gust = data.wind.gust;
+        }
+    }
+    if (canvas.getContext && speed > 0) {
+        var red = 0;
+        var green = 0;
+        if (speed <= 10) {
+            green = 10*speed+155;
+            red = 255*speed/10.0;
+        } else {
+            red = 255;
+            green = 255-(255*(Math.min(speed, 21)-10)/11.0);
+        }
+        var ctx = canvas.getContext('2d');
+        ctx.translate(25, 25);
+        ctx.rotate(angle*Math.PI/180);
+        ctx.fillStyle = 'rgb(' + Math.floor(red) + ',' + Math.floor(green) + ',' + 0 + ')';
+        ctx.beginPath();
+        ctx.moveTo(-15, -25);
+        ctx.lineTo(0, -10);
+        ctx.lineTo(15, -25);
+        ctx.lineTo(0, 25);
+        ctx.fill();
+
+        // draw inner arrow for gust
+        if (gust > 0 && gust != speed) {
+            if (gust <= 10) {
+                green = 10*gust+155;
+                red = 255*gust/10.0;
+            } else {
+                red = 255;
+                green = 255-(255*(Math.min(gust, 21)-10)/11.0);
+            }
+            canvas.title += ', gust ' + data.wind.gust + ' m/s';
+            canvas.title += ', ' + owm._windMsToBft(data.wind.gust) + ' BFT';
+            ctx.fillStyle = 'rgb(' + Math.floor(red) + ',' + Math.floor(green) + ',' + 0 + ')';
+            ctx.beginPath();
+            ctx.moveTo(-15, -25);
+            ctx.lineTo(0, -10);
+            //ctx.lineTo(15, -25);
+            ctx.lineTo(0, 25);
+            ctx.fill();
+        }
+    } else {
+        canvas.innerHTML = '<div>'
+                + (typeof data.wind != 'undefined' && typeof data.wind.deg != 'undefined' ? data.wind.deg + 'Â°' : '')
+                + '</div>';
+    }
+}
+
+/**
+ * Helper function for replacing leaflet-openweathermap's builtin marker by a wind rose symbol.
+ * This function is called event-driven when the layer and its markers are added. Now we can draw all marker symbols.
+ * The this-context has to be the windrose layer.
+ */
+function windroseAdded(e) {
+    for (var i in this._markers) {
+        var m = this._markers[i];
+        var cv = document.getElementById('id_' + m.options.owmId);
+        for (var j in this._cache._cachedData.list) {
+            var station = this._cache._cachedData.list[j];
+            if (station.id == m.options.owmId) {
+                myWindroseDrawCanvas(station, this);
+            }
+        }
+    }
 }

@@ -15,6 +15,8 @@ Would be nice
 -------------
 * Recalc routes button
 
+* Drag/drop markers instead of one-time setting of their locations
+
 * Save routes in a seperate table for saving and fast redrawing of scenarios
 
 * Consider floodzones in DD calculation

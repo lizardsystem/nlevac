@@ -29,10 +29,11 @@ var app = express();
 
 // Configure Express
 app.configure(function(){
+  app.use(express.compress());
   app.set('port', process.env.PORT || 3034);
   app.set('views', __dirname + '/views');
   // app.set('view engine', 'ejs');
-  app.set('view engine', 'html');
+  // app.set('view engine', 'html');
   // app.enable('view cache');
   app.engine('jade', require('jade').__express);
   app.set('layout', 'layout');
@@ -45,10 +46,9 @@ app.configure(function(){
     res.header("Access-Control-Allow-Headers", "X-Requested-With");
     next();
   });
-  app.use(express.compress());
   app.use(express.methodOverride());
-  app.use(express.cookieParser('nlevac010103'));
-  app.use(express.session());
+  // app.use(express.cookieParser('nlevac010103'));
+  // app.use(express.session());
   app.use(express.static(path.join(__dirname, 'public')));
 });
 
@@ -70,11 +70,11 @@ client.on('error', function(error) {
 });
 
 
-app.get('/edge',
+app.get('/api/v1/edge',
 function(req, res) {
 
   var lonlat = [req.query.lon, req.query.lat];
-  console.log('lonlat:',lonlat);
+  // console.log('lonlat:',lonlat);
   var search_factor = .01;
 
   var lon = parseFloat(lonlat[0]);
@@ -99,21 +99,22 @@ function(req, res) {
                 dist \
              LIMIT 1";
 
-  console.log('edge sql: ', sql);             
+  // console.log('edge sql: ', sql);             
   var query = client.query(sql, []);
 
   query.on('row', function(row) {
-    console.log('row:', row);
+    // console.log('row:', row);
     return res.json(JSON.stringify(row));
   });
   query.on('error', function(error) {
     console.log(error);
   });
+
 });
 
 
 
-app.get('/route/:clientid',
+app.get('/api/v1/route/:clientid',
 function(req, res) {
 
   var startEdge = parseFloat(req.query.startedge);
@@ -133,9 +134,7 @@ function(req, res) {
             "+startEdge+", "+endEdge+", false, false)                               \
             JOIN "+pgroutingTable+"                                                 \
             ON id2 = "+pgroutingTable+".id ORDER BY seq";
-
-
-
+          
   var query = client.query(sql, function(err, result) {
     if(result) {
 
@@ -143,7 +142,7 @@ function(req, res) {
       res.json(json);
     } else {
       console.log(err);
-      res.json({});
+      res.json(err);
     }
   });
   query.on('error', function(error) {
@@ -151,7 +150,7 @@ function(req, res) {
   });
 });
 
-app.get('/catchment/:clientid',
+app.get('/api/v1/catchment/:clientid',
 function(req, res) {
   var clientid = parseInt(req.param('clientid'));
   var length = parseFloat(req.query.length);
@@ -176,7 +175,7 @@ function(req, res) {
 
 
 
-  console.log('catchment sql: ', sql);
+  // console.log('catchment sql: ', sql);
 
   var query = client.query(sql, function(err, result) {
     //NOTE: error handling not present
@@ -195,10 +194,10 @@ function(req, res) {
 });
 
 
-app.post('/polygon/:clientid',
+app.post('/api/v1/polygon/:clientid',
 function(req, res) {
-  console.log('req.body.polygon:', req.body.polygon);
-  console.log('id:', req.param('clientid'));
+  // console.log('req.body.polygon:', req.body.polygon);
+  // console.log('id:', req.param('clientid'));
   var clientid = parseInt(req.param('clientid'));
 
   var query = client.query('INSERT INTO "polygons" (the_geom, clientid) VALUES (ST_GeomFromGeoJSON($1), ($2))', [req.body.polygon, clientid]);
@@ -210,13 +209,13 @@ function(req, res) {
   });
 });
 
-app.get('/polygons/:clientid',
+app.get('/api/v1/polygons/:clientid',
 function(req, res) {
   var clientid = parseInt(req.param('clientid'));
   var query = client.query('SELECT ST_AsGeoJSON(the_geom) AS geometry FROM "polygons" WHERE clientid = $1', [clientid]);
   var rows = [];
   query.on('row', function(row) {
-    console.log(row);
+    // console.log(row);
     rows.push(row);
   });
   query.on('end', function(result) {
@@ -254,7 +253,7 @@ function(req, res) {
 
       // Let's turn that into the original ID
       var id = hashids.decrypt(hash);
-      console.log('id: ' + id + ', hash: ' + hash);
+      // console.log('id: ' + id + ', hash: ' + hash);
 
       if (!parseInt(id)) {
         // No integer returned by hash decryptor
@@ -264,7 +263,7 @@ function(req, res) {
         // Check if it exists
         var query = client.query('SELECT COUNT(*) AS total FROM "sessions" WHERE id = $1', [parseInt(id)]);
         query.on('row', function(row) {
-          console.log(row.total);
+          // console.log(row.total);
           if(row.total > 0) {
             // If so, pass it into the template
             res.render('index.jade', {

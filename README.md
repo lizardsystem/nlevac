@@ -1,7 +1,17 @@
 nlevac
 ======
 
-This is a proof-of-concept interactive Reachability Analysis tool.
+This is a proof-of-concept interactive Reachability Analysis and Routing tool.
+
+
+API Endpoints
+-------------
+
+ * GET /api/v1/edge/ - finds a routable edge in proximity of given latlon
+ * GET /api/v1/route/:clientid - calculates route between two edges and intersects with the polygons of :clientid
+ * GET /api/v1/catchment/:clientid - calculates driveshed from a given latlon, respects polygons of :clientid
+ * GET /api/v1/polygons:/:clientid - returns all polygons for :clientid
+ * POST /api/v1/polygon/:id - accepts a polygon in 3857 projection and stores it using :clientid
 
 
 Installation
